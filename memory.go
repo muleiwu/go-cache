@@ -15,8 +15,8 @@ type Memory struct {
 	cache *cache.Cache
 }
 
-func NewMemory(c *cache.Cache) *Memory {
-	return &Memory{cache: c}
+func NewMemory(defaultExpiration, cleanupInterval time.Duration) *Memory {
+	return &Memory{cache: cache.New(defaultExpiration, cleanupInterval)}
 }
 
 func (c *Memory) Exists(ctx context.Context, key string) bool {

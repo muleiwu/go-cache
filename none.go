@@ -12,6 +12,10 @@ type None struct {
 }
 
 func NewCacheNone() *None {
+	return NewNone()
+}
+
+func NewNone() *None {
 	return &None{}
 }
 
