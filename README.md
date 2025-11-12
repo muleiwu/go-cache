@@ -13,7 +13,8 @@ go-cache is a unified interface Go cache library that provides multiple cache im
 - **Type Safety**: Uses reflection to ensure type-safe value assignment
 - **TTL Support**: Supports setting time-to-live for keys
 - **Cache Penetration Protection**: Provides `GetSet` method to prevent cache penetration
-- **Serialization Support**: Uses msgpack for efficient serialization and deserialization
+- **Serialization Support**: Uses Go's native gob encoding for efficient and type-safe serialization
+- **Nil Value Support**: Supports storing and retrieving nil pointers, slices, and maps
 - **Expiration Management**: Supports setting specific expiration times or relative TTL
 - **Context Support**: All operations support context.Context
 
@@ -277,8 +278,9 @@ func NewRedis(conn *redis.Client) *Redis
 #### Features
 
 - Redis-based distributed cache
-- Uses msgpack for serialization
-- Supports all Redis data types
+- Uses Go's native gob encoding for serialization
+- Full type safety with automatic type registration
+- Supports complex structs, pointers, slices, maps, and nil values
 - Suitable for distributed systems
 
 #### Usage Example
@@ -619,10 +621,13 @@ func BenchmarkMemoryCacheGet(b *testing.B) {
 - The `obj` parameter for `Get` and `GetSet` methods must be a pointer type
 - Ensure the passed type matches the stored type, otherwise a type mismatch error will be returned
 
-### 2. Serialization Limitations
+### 2. Serialization Support
 
-- Redis cache uses msgpack serialization, which does not support non-serializable types like functions, channels, etc.
-- Complex structs need to ensure all fields are serializable
+- Redis cache uses Go's native gob encoding
+- ✅ Fully supports: all Go types including complex structs, nested types, pointers, slices, maps
+- ✅ Supports nil values: nil pointers, nil slices, nil maps
+- ❌ Does not support: functions, channels (gob limitation)
+- Type information is automatically preserved during serialization
 
 ### 3. Memory Management
 
@@ -675,7 +680,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [gsr Interface Library](https://github.com/muleiwu/gsr)
 - [patrickmn/go-cache](https://github.com/patrickmn/go-cache)
 - [redis/go-redis](https://github.com/redis/go-redis)
-- [vmihailenco/msgpack](https://github.com/vmihailenco/msgpack)
+- [Go encoding/gob](https://pkg.go.dev/encoding/gob)
 
 ## 📊 Performance Comparison
 
@@ -705,15 +710,28 @@ cache := go_cache.NewRedis(redisClient)
 
 ### Q: How to handle nil values in cache?
 
-A: go-cache does not support direct storage of nil values, it is recommended to use pointer types or special markers:
+A: go-cache fully supports nil values (after switching to gob encoding):
 
 ```go
-// Use pointer type
-var user *User
-cache.Set(ctx, "user:123", user, 10*time.Minute)
+// Store and retrieve nil pointer
+var user *User  // nil pointer
+cache.Set(ctx, "user:123", user, 10*time.Minute)  // ✅ Works
 
-// Or use special marker
-cache.Set(ctx, "user:123", nil, 10*time.Minute) // Not recommended
+var retrieved *User
+cache.Get(ctx, "user:123", &retrieved)  // retrieved will be nil
+
+// Store and retrieve nil slice
+var tags []string  // nil slice
+cache.Set(ctx, "tags:456", tags, 10*time.Minute)  // ✅ Works
+
+// Store and retrieve nil map
+var metadata map[string]int  // nil map
+cache.Set(ctx, "metadata:789", metadata, 10*time.Minute)  // ✅ Works
+
+// Can distinguish between nil value and key not existing
+cache.Set(ctx, "key1", (*User)(nil), 10*time.Minute)
+cache.Exists(ctx, "key1")  // true - key exists with nil value
+cache.Exists(ctx, "key2")  // false - key doesn't exist
 ```
 
 ### Q: How to monitor cache performance?

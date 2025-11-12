@@ -118,6 +118,21 @@ func (c *Memory) assignValue(obj any, value interface{}) error {
 		return fmt.Errorf("obj cannot be set")
 	}
 
+	// 如果value是nil，特殊处理
+	if value == nil {
+		// 如果是指针类型，设置为nil
+		if objElem.Kind() == reflect.Ptr ||
+			objElem.Kind() == reflect.Slice ||
+			objElem.Kind() == reflect.Map ||
+			objElem.Kind() == reflect.Chan ||
+			objElem.Kind() == reflect.Func ||
+			objElem.Kind() == reflect.Interface {
+			objElem.Set(reflect.Zero(objElem.Type()))
+			return nil
+		}
+		return fmt.Errorf("cannot assign nil to non-pointer type %s", objElem.Type())
+	}
+
 	valueReflect := reflect.ValueOf(value)
 	if !valueReflect.IsValid() {
 		return fmt.Errorf("value is not valid")
