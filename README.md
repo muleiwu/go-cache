@@ -4,49 +4,49 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/muleiwu/go-cache)](https://goreportcard.com/report/github.com/muleiwu/go-cache)
 
-go-cache 是一个统一接口的 Go 缓存库，提供了多种缓存实现方式，包括内存缓存、Redis 缓存和空缓存。该库实现了 `gsr.Cacher` 接口，支持在不同缓存实现之间无缝切换，为应用程序提供灵活的缓存解决方案。
+go-cache is a unified interface Go cache library that provides multiple cache implementations, including memory cache, Redis cache, and null cache. The library implements the `gsr.Cacher` interface, supporting seamless switching between different cache implementations to provide flexible caching solutions for applications.
 
-## 🚀 特性
+## 🚀 Features
 
-- **统一接口**: 所有缓存实现都遵循 `gsr.Cacher` 接口，便于切换和测试
-- **多种实现**: 支持内存缓存、Redis 缓存和空缓存实现
-- **类型安全**: 使用反射确保类型安全的值赋值
-- **TTL 支持**: 支持设置键的生存时间
-- **缓存穿透保护**: 提供 `GetSet` 方法防止缓存穿透
-- **序列化支持**: 使用 msgpack 进行高效的序列化和反序列化
-- **过期管理**: 支持设置具体的过期时间或相对的 TTL
-- **上下文支持**: 所有操作都支持 context.Context
+- **Unified Interface**: All cache implementations follow the `gsr.Cacher` interface, making it easy to switch and test
+- **Multiple Implementations**: Support for memory cache, Redis cache, and null cache implementations
+- **Type Safety**: Uses reflection to ensure type-safe value assignment
+- **TTL Support**: Supports setting time-to-live for keys
+- **Cache Penetration Protection**: Provides `GetSet` method to prevent cache penetration
+- **Serialization Support**: Uses msgpack for efficient serialization and deserialization
+- **Expiration Management**: Supports setting specific expiration times or relative TTL
+- **Context Support**: All operations support context.Context
 
-## 📦 安装
+## 📦 Installation
 
-使用 go get 安装 go-cache：
+Install go-cache using go get:
 
 ```bash
 go get github.com/muleiwu/go-cache
 ```
 
-## 🏗️ 架构概览
+## 🏗️ Architecture Overview
 
 ```
 go-cache/
-├── memory.go          # 内存缓存实现
-├── redis.go           # Redis 缓存实现
-├── none.go            # 空缓存实现
-└── cache_value/       # 缓存值处理
-    └── cache_value.go # 序列化/反序列化逻辑
+├── memory.go          # Memory cache implementation
+├── redis.go           # Redis cache implementation
+├── none.go            # Null cache implementation
+└── cache_value/       # Cache value processing
+    └── cache_value.go # Serialization/deserialization logic
 ```
 
-### 核心组件
+### Core Components
 
-1. **缓存接口** (`gsr.Cacher`): 定义了统一的缓存操作接口
-2. **内存缓存** (`Memory`): 基于内存的缓存实现，适用于单机应用
-3. **Redis缓存** (`Redis`): 基于 Redis 的分布式缓存实现
-4. **空缓存** (`None`): 空操作实现，用于测试或禁用缓存场景
-5. **值处理** (`cache_value`): 处理缓存值的序列化和反序列化
+1. **Cache Interface** (`gsr.Cacher`): Defines unified cache operation interface
+2. **Memory Cache** (`Memory`): Memory-based cache implementation, suitable for single-machine applications
+3. **Redis Cache** (`Redis`): Redis-based distributed cache implementation
+4. **Null Cache** (`None`): No-op implementation for testing or disabling cache scenarios
+5. **Value Processing** (`cache_value`): Handles serialization and deserialization of cache values
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 内存缓存示例
+### Memory Cache Example
 
 ```go
 package main
@@ -60,24 +60,24 @@ import (
 )
 
 func main() {
-	// 创建内存缓存，默认过期时间 5 分钟，清理间隔 10 分钟
+	// Create memory cache with default expiration 5 minutes, cleanup interval 10 minutes
 	cache := go_cache.NewMemory(5*time.Minute, 10*time.Minute)
 	ctx := context.Background()
 	
-	// 设置缓存
-	err := cache.Set(ctx, "user:123", &User{ID: 123, Name: "张三"}, 10*time.Minute)
+	// Set cache
+	err := cache.Set(ctx, "user:123", &User{ID: 123, Name: "John Doe"}, 10*time.Minute)
 	if err != nil {
 		panic(err)
 	}
 	
-	// 获取缓存
+	// Get cache
 	var user User
 	err = cache.Get(ctx, "user:123", &user)
 	if err != nil {
 		panic(err)
 	}
 	
-	fmt.Printf("用户: %+v\n", user)
+	fmt.Printf("User: %+v\n", user)
 }
 
 type User struct {
@@ -86,7 +86,7 @@ type User struct {
 }
 ```
 
-### Redis 缓存示例
+### Redis Cache Example
 
 ```go
 package main
@@ -101,31 +101,31 @@ import (
 )
 
 func main() {
-	// 创建 Redis 客户端
+	// Create Redis client
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
-		Password: "", // 无密码
-		DB:       0,  // 默认 DB
+		Password: "", // No password
+		DB:       0,  // Default DB
 	})
 	
-	// 创建 Redis 缓存
+	// Create Redis cache
 	cache := go_cache.NewRedis(rdb)
 	ctx := context.Background()
 	
-	// 设置缓存
-	err := cache.Set(ctx, "product:456", &Product{ID: 456, Name: "商品A", Price: 99.99}, 30*time.Minute)
+	// Set cache
+	err := cache.Set(ctx, "product:456", &Product{ID: 456, Name: "Product A", Price: 99.99}, 30*time.Minute)
 	if err != nil {
 		panic(err)
 	}
 	
-	// 获取缓存
+	// Get cache
 	var product Product
 	err = cache.Get(ctx, "product:456", &product)
 	if err != nil {
 		panic(err)
 	}
 	
-	fmt.Printf("商品: %+v\n", product)
+	fmt.Printf("Product: %+v\n", product)
 }
 
 type Product struct {
@@ -135,7 +135,7 @@ type Product struct {
 }
 ```
 
-### 缓存穿透保护示例
+### Cache Penetration Protection Example
 
 ```go
 package main
@@ -152,14 +152,14 @@ func main() {
 	cache := go_cache.NewMemory(5*time.Minute, 10*time.Minute)
 	ctx := context.Background()
 	
-	// 使用 GetSet 防止缓存穿透
+	// Use GetSet to prevent cache penetration
 	var user User
 	err := cache.GetSet(ctx, "user:789", 10*time.Minute, &user, func(key string, obj any) error {
-		// 缓存未命中时从数据库获取数据
-		fmt.Println("从数据库获取用户数据...")
+		// Fetch data from database when cache miss occurs
+		fmt.Println("Fetching user data from database...")
 		user := obj.(*User)
 		user.ID = 789
-		user.Name = "李四"
+		user.Name = "Jane Smith"
 		return nil
 	})
 	
@@ -167,12 +167,12 @@ func main() {
 		panic(err)
 	}
 	
-	fmt.Printf("用户: %+v\n", user)
+	fmt.Printf("User: %+v\n", user)
 	
-	// 第二次调用会直接从缓存获取
+	// Second call will get directly from cache
 	var user2 User
 	err = cache.GetSet(ctx, "user:789", 10*time.Minute, &user2, func(key string, obj any) error {
-		fmt.Println("这个回调不会被调用，因为缓存已存在")
+		fmt.Println("This callback won't be called because cache already exists")
 		return nil
 	})
 	
@@ -180,7 +180,7 @@ func main() {
 		panic(err)
 	}
 	
-	fmt.Printf("用户2: %+v\n", user2)
+	fmt.Printf("User2: %+v\n", user2)
 }
 
 type User struct {
@@ -189,223 +189,223 @@ type User struct {
 }
 ```
 
-## 📚 API 文档
+## 📚 API Documentation
 
-### 接口定义
+### Interface Definition
 
-go-cache 实现了 `gsr.Cacher` 接口，定义了以下方法：
+go-cache implements the `gsr.Cacher` interface, which defines the following methods:
 
 ```go
 type Cacher interface {
-    // Exists 检查键是否存在
+    // Exists checks if a key exists
     Exists(ctx context.Context, key string) bool
     
-    // Get 获取缓存值，将结果反序列化到 obj 中
+    // Get gets cache value and deserializes the result into obj
     Get(ctx context.Context, key string, obj any) error
     
-    // Set 设置缓存值，ttl 为生存时间
+    // Set sets cache value, ttl is the time-to-live
     Set(ctx context.Context, key string, value any, ttl time.Duration) error
     
-    // GetSet 获取缓存值，如果不存在则通过回调函数获取并设置
+    // GetSet gets cache value, if not exists, gets and sets through callback function
     GetSet(ctx context.Context, key string, ttl time.Duration, obj any, funCallback CacheCallback) error
     
-    // Del 删除缓存键
+    // Del deletes cache key
     Del(ctx context.Context, key string) error
     
-    // ExpiresAt 设置键在特定时间过期
+    // ExpiresAt sets key to expire at specific time
     ExpiresAt(ctx context.Context, key string, expiresAt time.Time) error
     
-    // ExpiresIn 设置键在指定时间后过期
+    // ExpiresIn sets key to expire after specified time
     ExpiresIn(ctx context.Context, key string, ttl time.Duration) error
 }
 
 type CacheCallback func(key string, obj any) error
 ```
 
-### 内存缓存 (Memory)
+### Memory Cache (Memory)
 
-#### 构造函数
+#### Constructor
 
 ```go
 func NewMemory(defaultExpiration, cleanupInterval time.Duration) *Memory
 ```
 
-- `defaultExpiration`: 默认过期时间
-- `cleanupInterval`: 清理过期项的时间间隔
+- `defaultExpiration`: Default expiration time
+- `cleanupInterval`: Time interval for cleaning up expired items
 
-#### 特性
+#### Features
 
-- 基于内存的缓存实现
-- 使用 `github.com/patrickmn/go-cache` 作为底层存储
-- 支持自动清理过期项
-- 线程安全
+- Memory-based cache implementation
+- Uses `github.com/patrickmn/go-cache` as underlying storage
+- Supports automatic cleanup of expired items
+- Thread-safe
 
-#### 使用示例
+#### Usage Example
 
 ```go
-// 创建内存缓存
+// Create memory cache
 cache := go_cache.NewMemory(5*time.Minute, 10*time.Minute)
 
-// 设置缓存
+// Set cache
 err := cache.Set(ctx, "key", "value", 10*time.Minute)
 
-// 获取缓存
+// Get cache
 var result string
 err = cache.Get(ctx, "key", &result)
 
-// 检查键是否存在
+// Check if key exists
 exists := cache.Exists(ctx, "key")
 
-// 删除键
+// Delete key
 err = cache.Del(ctx, "key")
 
-// 设置过期时间
+// Set expiration time
 err = cache.ExpiresIn(ctx, "key", 5*time.Minute)
 err = cache.ExpiresAt(ctx, "key", time.Now().Add(5*time.Minute))
 ```
 
-### Redis 缓存 (Redis)
+### Redis Cache (Redis)
 
-#### 构造函数
+#### Constructor
 
 ```go
 func NewRedis(conn *redis.Client) *Redis
 ```
 
-- `conn`: Redis 客户端连接
+- `conn`: Redis client connection
 
-#### 特性
+#### Features
 
-- 基于 Redis 的分布式缓存
-- 使用 msgpack 进行序列化
-- 支持所有 Redis 数据类型
-- 适用于分布式系统
+- Redis-based distributed cache
+- Uses msgpack for serialization
+- Supports all Redis data types
+- Suitable for distributed systems
 
-#### 使用示例
+#### Usage Example
 
 ```go
-// 创建 Redis 客户端
+// Create Redis client
 rdb := redis.NewClient(&redis.Options{
     Addr:     "localhost:6379",
     Password: "",
     DB:       0,
 })
 
-// 创建 Redis 缓存
+// Create Redis cache
 cache := go_cache.NewRedis(rdb)
 
-// 使用方式与内存缓存相同
+// Usage is the same as memory cache
 err := cache.Set(ctx, "key", "value", 10*time.Minute)
 var result string
 err = cache.Get(ctx, "key", &result)
 ```
 
-### 空缓存 (None)
+### Null Cache (None)
 
-#### 构造函数
+#### Constructor
 
 ```go
 func NewNone() *None
-func NewCacheNone() *None  // 别名
+func NewCacheNone() *None  // Alias
 ```
 
-#### 特性
+#### Features
 
-- 所有操作都是空操作或返回错误
-- 用于测试或禁用缓存的场景
-- 不存储任何数据
+- All operations are no-ops or return errors
+- Used for testing or disabling cache scenarios
+- Does not store any data
 
-#### 使用示例
+#### Usage Example
 
 ```go
-// 创建空缓存
+// Create null cache
 cache := go_cache.NewNone()
 
-// Set 操作总是成功但不存储数据
-err := cache.Set(ctx, "key", "value", 10*time.Minute) // 返回 nil
+// Set operation always succeeds but doesn't store data
+err := cache.Set(ctx, "key", "value", 10*time.Minute) // returns nil
 
-// Get 操作总是返回错误
+// Get operation always returns error
 var result string
-err := cache.Get(ctx, "key", &result) // 返回 "not implemented" 错误
+err = cache.Get(ctx, "key", &result) // returns "not implemented" error
 
-// Exists 总是返回 false
-exists := cache.Exists(ctx, "key") // 返回 false
+// Exists always returns false
+exists := cache.Exists(ctx, "key") // returns false
 ```
 
-## 🎯 使用场景和最佳实践
+## 🎯 Use Cases and Best Practices
 
-### 1. 缓存策略选择
+### 1. Cache Strategy Selection
 
-#### 内存缓存适用场景
-- 单机应用
-- 对性能要求极高的场景
-- 数据量不大的应用
-- 开发和测试环境
+#### Memory Cache Use Cases
+- Single-machine applications
+- Scenarios with extremely high performance requirements
+- Applications with small data volume
+- Development and testing environments
 
-#### Redis 缓存适用场景
-- 分布式系统
-- 需要持久化的缓存
-- 大数据量应用
-- 生产环境
+#### Redis Cache Use Cases
+- Distributed systems
+- Scenarios requiring persistent cache
+- Applications with large data volume
+- Production environments
 
-#### 空缓存适用场景
-- 单元测试
-- 需要禁用缓存的环境
-- 性能基准测试
+#### Null Cache Use Cases
+- Unit testing
+- Environments where cache needs to be disabled
+- Performance benchmarking
 
-### 2. 缓存模式
+### 2. Cache Patterns
 
-#### Cache-Aside 模式
+#### Cache-Aside Pattern
 
 ```go
 func GetUser(id int) (*User, error) {
     var user User
     
-    // 先从缓存获取
+    // First try to get from cache
     err := cache.Get(ctx, fmt.Sprintf("user:%d", id), &user)
     if err == nil {
         return &user, nil
     }
     
-    // 缓存未命中，从数据库获取
+    // Cache miss, get from database
     user, err = db.GetUser(id)
     if err != nil {
         return nil, err
     }
     
-    // 写入缓存
+    // Write to cache
     cache.Set(ctx, fmt.Sprintf("user:%d", id), user, 10*time.Minute)
     
     return user, nil
 }
 ```
 
-#### Write-Through 模式
+#### Write-Through Pattern
 
 ```go
 func UpdateUser(user *User) error {
-    // 先更新数据库
+    // Update database first
     err := db.UpdateUser(user)
     if err != nil {
         return err
     }
     
-    // 同时更新缓存
+    // Update cache at the same time
     return cache.Set(ctx, fmt.Sprintf("user:%d", user.ID), user, 10*time.Minute)
 }
 ```
 
-#### Write-Behind 模式
+#### Write-Behind Pattern
 
 ```go
 func UpdateUserAsync(user *User) error {
-    // 立即更新缓存
+    // Update cache immediately
     err := cache.Set(ctx, fmt.Sprintf("user:%d", user.ID), user, 10*time.Minute)
     if err != nil {
         return err
     }
     
-    // 异步更新数据库
+    // Update database asynchronously
     go func() {
         db.UpdateUser(user)
     }()
@@ -414,25 +414,25 @@ func UpdateUserAsync(user *User) error {
 }
 ```
 
-### 3. 缓存穿透保护
+### 3. Cache Penetration Protection
 
-使用 `GetSet` 方法可以有效防止缓存穿透：
+Using the `GetSet` method can effectively prevent cache penetration:
 
 ```go
 func GetProduct(id int) (*Product, error) {
     var product Product
     
-    // 使用 GetSet 防止缓存穿透
+    // Use GetSet to prevent cache penetration
     err := cache.GetSet(ctx, fmt.Sprintf("product:%d", id), 30*time.Minute, &product, func(key string, obj any) error {
-        // 缓存未命中时的回调函数
+        // Callback function when cache miss occurs
         p, err := db.GetProduct(id)
         if err != nil {
             return err
         }
         
-        // 将结果赋值给 obj
+        // Assign result to obj
         productPtr := obj.(*Product)
-        *userPtr = *p
+        *productPtr = *p
         return nil
     })
     
@@ -444,16 +444,16 @@ func GetProduct(id int) (*Product, error) {
 }
 ```
 
-### 4. 缓存雪崩预防
+### 4. Cache Avalanche Prevention
 
 ```go
-// 为不同的键设置不同的过期时间
+// Set different expiration times for different keys
 func SetUserWithRandomTTL(user *User) error {
-    // 基础 TTL 为 10 分钟
+    // Base TTL is 10 minutes
     baseTTL := 10 * time.Minute
     
-    // 添加随机偏移量，防止同时过期
-    randomOffset := time.Duration(rand.Intn(300)) * time.Second // 0-5 分钟随机偏移
+    // Add random offset to prevent simultaneous expiration
+    randomOffset := time.Duration(rand.Intn(300)) * time.Second // 0-5 minutes random offset
     
     ttl := baseTTL + randomOffset
     
@@ -461,11 +461,11 @@ func SetUserWithRandomTTL(user *User) error {
 }
 ```
 
-### 5. 缓存预热
+### 5. Cache Warmup
 
 ```go
 func WarmupCache() error {
-    // 预加载热点数据
+    // Preload hot data
     hotUsers := []int{1, 2, 3, 4, 5}
     
     for _, id := range hotUsers {
@@ -482,40 +482,40 @@ func WarmupCache() error {
 }
 ```
 
-## 🔧 高级配置
+## 🔧 Advanced Configuration
 
-### 内存缓存调优
+### Memory Cache Tuning
 
 ```go
-// 高频访问场景：短过期时间，频繁清理
+// High-frequency access scenarios: short expiration time, frequent cleanup
 cache := go_cache.NewMemory(1*time.Minute, 2*time.Minute)
 
-// 低频访问场景：长过期时间，低频清理
+// Low-frequency access scenarios: long expiration time, infrequent cleanup
 cache := go_cache.NewMemory(30*time.Minute, 1*time.Hour)
 
-// 大数据量场景：增加清理频率
+// Large data volume scenarios: increase cleanup frequency
 cache := go_cache.NewMemory(10*time.Minute, 5*time.Minute)
 ```
 
-### Redis 配置优化
+### Redis Configuration Optimization
 
 ```go
-// 使用连接池
+// Use connection pool
 rdb := redis.NewClient(&redis.Options{
     Addr:         "localhost:6379",
     Password:     "",
     DB:           0,
-    PoolSize:     10,  // 连接池大小
-    MinIdleConns: 5,   // 最小空闲连接
-    MaxRetries:   3,   // 最大重试次数
+    PoolSize:     10,  // Connection pool size
+    MinIdleConns: 5,   // Minimum idle connections
+    MaxRetries:   3,   // Maximum retry count
 })
 
 cache := go_cache.NewRedis(rdb)
 ```
 
-## 🧪 测试
+## 🧪 Testing
 
-### 单元测试示例
+### Unit Test Example
 
 ```go
 package main
@@ -533,7 +533,7 @@ func TestMemoryCache(t *testing.T) {
     cache := go_cache.NewMemory(5*time.Minute, 10*time.Minute)
     ctx := context.Background()
     
-    // 测试设置和获取
+    // Test set and get
     err := cache.Set(ctx, "test_key", "test_value", 10*time.Minute)
     assert.NoError(t, err)
     
@@ -542,10 +542,10 @@ func TestMemoryCache(t *testing.T) {
     assert.NoError(t, err)
     assert.Equal(t, "test_value", result)
     
-    // 测试键存在性
+    // Test key existence
     assert.True(t, cache.Exists(ctx, "test_key"))
     
-    // 测试删除
+    // Test deletion
     err = cache.Del(ctx, "test_key")
     assert.NoError(t, err)
     assert.False(t, cache.Exists(ctx, "test_key"))
@@ -558,7 +558,7 @@ func TestCacheGetSet(t *testing.T) {
     var result string
     callCount := 0
     
-    // 第一次调用，缓存未命中
+    // First call, cache miss
     err := cache.GetSet(ctx, "test_key", 10*time.Minute, &result, func(key string, obj any) error {
         callCount++
         str := obj.(*string)
@@ -570,7 +570,7 @@ func TestCacheGetSet(t *testing.T) {
     assert.Equal(t, "callback_value", result)
     assert.Equal(t, 1, callCount)
     
-    // 第二次调用，缓存命中
+    // Second call, cache hit
     err = cache.GetSet(ctx, "test_key", 10*time.Minute, &result, func(key string, obj any) error {
         callCount++
         return nil
@@ -578,11 +578,11 @@ func TestCacheGetSet(t *testing.T) {
     
     assert.NoError(t, err)
     assert.Equal(t, "callback_value", result)
-    assert.Equal(t, 1, callCount) // 回调函数未被调用
+    assert.Equal(t, 1, callCount) // Callback function not called
 }
 ```
 
-### 基准测试
+### Benchmark Testing
 
 ```go
 func BenchmarkMemoryCacheSet(b *testing.B) {
@@ -599,7 +599,7 @@ func BenchmarkMemoryCacheGet(b *testing.B) {
     cache := go_cache.NewMemory(5*time.Minute, 10*time.Minute)
     ctx := context.Background()
     
-    // 预设数据
+    // Preset data
     for i := 0; i < 1000; i++ {
         cache.Set(ctx, fmt.Sprintf("key_%d", i), fmt.Sprintf("value_%d", i), 10*time.Minute)
     }
@@ -612,113 +612,113 @@ func BenchmarkMemoryCacheGet(b *testing.B) {
 }
 ```
 
-## 🚨 注意事项
+## 🚨 Important Notes
 
-### 1. 类型安全
+### 1. Type Safety
 
-- `Get` 和 `GetSet` 方法的 `obj` 参数必须是指针类型
-- 确保传入的类型与存储的类型匹配，否则会返回类型不匹配错误
+- The `obj` parameter for `Get` and `GetSet` methods must be a pointer type
+- Ensure the passed type matches the stored type, otherwise a type mismatch error will be returned
 
-### 2. 序列化限制
+### 2. Serialization Limitations
 
-- Redis 缓存使用 msgpack 序列化，不支持函数、通道等不可序列化的类型
-- 复杂结构体需要确保所有字段都是可序列化的
+- Redis cache uses msgpack serialization, which does not support non-serializable types like functions, channels, etc.
+- Complex structs need to ensure all fields are serializable
 
-### 3. 内存管理
+### 3. Memory Management
 
-- 内存缓存会占用应用程序内存，注意监控内存使用情况
-- 设置合适的清理间隔，避免内存泄漏
+- Memory cache occupies application memory, monitor memory usage
+- Set appropriate cleanup intervals to avoid memory leaks
 
-### 4. 并发安全
+### 4. Concurrency Safety
 
-- 所有缓存实现都是并发安全的
-- 但在回调函数中仍需要注意并发问题
+- All cache implementations are concurrency-safe
+- But still need to pay attention to concurrency issues in callback functions
 
-### 5. 错误处理
+### 5. Error Handling
 
-- Redis 缓存可能会因为网络问题返回错误
-- 建议实现重试机制或降级策略
+- Redis cache may return errors due to network issues
+- It is recommended to implement retry mechanisms or fallback strategies
 
-## 🤝 贡献
+## 🤝 Contributing
 
-欢迎贡献代码！请遵循以下步骤：
+Contributions are welcome! Please follow these steps:
 
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
+1. Fork this repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-### 开发环境设置
+### Development Environment Setup
 
 ```bash
-# 克隆仓库
+# Clone repository
 git clone https://github.com/muleiwu/go-cache.git
 cd go-cache
 
-# 安装依赖
+# Install dependencies
 go mod tidy
 
-# 运行测试
+# Run tests
 go test ./...
 
-# 运行基准测试
+# Run benchmark tests
 go test -bench=. ./...
 ```
 
-## 📄 许可证
+## 📄 License
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🔗 相关链接
+## 🔗 Related Links
 
-- [gsr 接口库](https://github.com/muleiwu/gsr)
+- [gsr Interface Library](https://github.com/muleiwu/gsr)
 - [patrickmn/go-cache](https://github.com/patrickmn/go-cache)
 - [redis/go-redis](https://github.com/redis/go-redis)
 - [vmihailenco/msgpack](https://github.com/vmihailenco/msgpack)
 
-## 📊 性能对比
+## 📊 Performance Comparison
 
-| 操作 | 内存缓存 | Redis 缓存 | 空缓存 |
-|------|----------|------------|--------|
-| Set  | ~100ns   | ~1ms       | ~10ns  |
-| Get  | ~100ns   | ~1ms       | ~10ns  |
-| Del  | ~100ns   | ~1ms       | ~10ns  |
+| Operation | Memory Cache | Redis Cache | Null Cache |
+|-----------|--------------|------------|------------|
+| Set       | ~100ns       | ~1ms       | ~10ns      |
+| Get       | ~100ns       | ~1ms       | ~10ns      |
+| Del       | ~100ns       | ~1ms       | ~10ns      |
 
-*注：以上数据为参考值，实际性能取决于硬件配置和网络环境*
+*Note: The above data are reference values, actual performance depends on hardware configuration and network environment*
 
-## 🆘 常见问题
+## 🆘 Frequently Asked Questions
 
-### Q: 如何在内存缓存和 Redis 缓存之间切换？
+### Q: How to switch between memory cache and Redis cache?
 
-A: 由于所有实现都遵循相同的接口，只需要更改初始化代码即可：
+A: Since all implementations follow the same interface, you only need to change the initialization code:
 
 ```go
-// 内存缓存
+// Memory cache
 cache := go_cache.NewMemory(5*time.Minute, 10*time.Minute)
 
-// Redis 缓存
+// Redis cache
 cache := go_cache.NewRedis(redisClient)
 
-// 其余代码无需修改
+// The rest of the code does not need to be modified
 ```
 
-### Q: 如何处理缓存中的 nil 值？
+### Q: How to handle nil values in cache?
 
-A: go-cache 不支持直接存储 nil 值，建议使用指针类型或特殊标记：
+A: go-cache does not support direct storage of nil values, it is recommended to use pointer types or special markers:
 
 ```go
-// 使用指针类型
+// Use pointer type
 var user *User
 cache.Set(ctx, "user:123", user, 10*time.Minute)
 
-// 或使用特殊标记
-cache.Set(ctx, "user:123", nil, 10*time.Minute) // 不推荐
+// Or use special marker
+cache.Set(ctx, "user:123", nil, 10*time.Minute) // Not recommended
 ```
 
-### Q: 如何监控缓存性能？
+### Q: How to monitor cache performance?
 
-A: 可以通过包装器模式添加监控功能：
+A: You can add monitoring functionality through the wrapper pattern:
 
 ```go
 type CacheWithMetrics struct {
@@ -730,7 +730,7 @@ func (c *CacheWithMetrics) Get(ctx context.Context, key string, obj any) error {
     err := c.cache.Get(ctx, key, obj)
     duration := time.Since(start)
     
-    // 记录指标
+    // Record metrics
     metrics.RecordCacheGetDuration(duration)
     if err != nil {
         metrics.RecordCacheMiss()
@@ -744,4 +744,4 @@ func (c *CacheWithMetrics) Get(ctx context.Context, key string, obj any) error {
 
 ---
 
-如有其他问题，请提交 [Issue](https://github.com/muleiwu/go-cache/issues) 或联系维护者。
+For other questions, please submit an [Issue](https://github.com/muleiwu/go-cache/issues) or contact the maintainer.
