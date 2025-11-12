@@ -88,7 +88,7 @@ go test ./test/ -bench=BenchmarkRedis -benchmem
     - 每个执行50次读写操作
 
 11. **TestRedisComplexStruct** - 复杂结构体存储
-    - 注意：有msgpack限制
+    - 使用 Gob 序列化器，完整支持复杂结构体
 
 12. **TestRedisConnectionFailure** - 连接失败处理
 
@@ -139,31 +139,36 @@ cache.ExpiresIn(ctx, key, 100*time.Millisecond)
 cache.ExpiresIn(ctx, key, 1*time.Second)
 ```
 
-### 2. msgpack序列化限制
+### 2. 序列化器选择
 
-复杂结构体无法直接反序列化：
+Redis 缓存支持可插拔的序列化系统：
 
+**Gob 序列化器**（默认）：
 ```go
+// 默认使用 Gob
+cache := go_cache.NewRedis(rdb)
+
+// 完整支持复杂结构体
 type Person struct {
     Name string
     Age  int
 }
 
-// ✅ 可以存储
 cache.Set(ctx, "key", Person{Name: "张三", Age: 30}, ttl)
-
-// ❌ 无法直接反序列化（会变成 map[string]interface{}）
 var p Person
-cache.Get(ctx, "key", &p)  // 类型不匹配错误
-
-// 💡 建议：对于复杂结构体，使用Memory缓存
+cache.Get(ctx, "key", &p)  // ✅ 完美工作
 ```
 
-### 3. 整数类型
+**JSON 序列化器**（可选）：
+```go
+// 使用 JSON 序列化器
+cache := go_cache.NewRedis(rdb, go_cache.WithRedisSerializer(serializer.NewJson()))
 
-msgpack可能会将整数编码为不同的类型（int8, int16, uint16等），导致类型不匹配。测试中已移除整数类型测试。
+// 优点：跨语言支持、人类可读
+// 缺点：性能略低、类型安全性较弱
+```
 
-### 4. Redis警告信息
+### 3. Redis警告信息
 
 测试时可能看到以下警告（可以忽略）：
 

@@ -394,7 +394,7 @@ func TestRedisConcurrentAccess(t *testing.T) {
 }
 
 // TestRedisComplexStruct 测试复杂结构体的序列化
-// 注意：由于msgpack序列化的特性，复杂结构体会被转换为map[string]interface{}
+// Gob 序列化器完整支持复杂结构体的序列化和反序列化
 func TestRedisComplexStruct(t *testing.T) {
 	cache, _, cleanup := setupRedisTest(t)
 	defer cleanup()
@@ -427,13 +427,31 @@ func TestRedisComplexStruct(t *testing.T) {
 		t.Fatalf("Set() error = %v", err)
 	}
 
-	// 验证能够存储（但不验证反序列化，因为msgpack的限制）
+	// 验证能够存储
 	if !cache.Exists(ctx, "person_key") {
 		t.Error("键应该存在")
 	}
 
-	// 注意：由于msgpack的限制，复杂结构体无法直接反序列化
-	// 如果需要使用复杂结构体，建议使用Memory缓存或自定义序列化
+	// 验证能够正确反序列化复杂结构体
+	var retrieved Person
+	err = cache.Get(ctx, "person_key", &retrieved)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+
+	// 验证数据完整性
+	if retrieved.Name != original.Name {
+		t.Errorf("Name mismatch: got %v, want %v", retrieved.Name, original.Name)
+	}
+	if retrieved.Age != original.Age {
+		t.Errorf("Age mismatch: got %v, want %v", retrieved.Age, original.Age)
+	}
+	if retrieved.Address.City != original.Address.City {
+		t.Errorf("Address.City mismatch: got %v, want %v", retrieved.Address.City, original.Address.City)
+	}
+	if retrieved.Address.Street != original.Address.Street {
+		t.Errorf("Address.Street mismatch: got %v, want %v", retrieved.Address.Street, original.Address.Street)
+	}
 }
 
 // TestRedisConnectionFailure 测试Redis连接失败的情况

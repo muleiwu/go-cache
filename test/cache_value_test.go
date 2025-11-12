@@ -146,7 +146,6 @@ func TestDecodeWithNonPointer(t *testing.T) {
 	}
 }
 
-// 注意：由于msgpack序列化的特性，复杂类型（如结构体、切片、map）
-// 在反序列化时会被转换为通用类型（map[string]interface{}, []interface{}等）
-// 因此这些类型的测试被移除或注释。
-// cache_value包主要用于简单类型或者在Memory缓存中使用（不需要序列化）
+// cache_value 包使用可插拔的序列化系统
+// 默认的 Gob 序列化器完整支持所有 Go 类型，包括复杂结构体、切片、map 等
+// Redis 缓存也支持 JSON 序列化器作为替代选项

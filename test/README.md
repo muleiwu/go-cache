@@ -63,8 +63,9 @@ go test ./test/ -run '^TestMemorySetAndGet$' -v
 - **TestDecodeWithNonPointer**: 测试传入非指针对象时的错误处理
 
 **注意事项**：
-- 由于 msgpack 序列化的特性，复杂类型（如结构体、切片、map）在反序列化时会被转换为通用类型（`map[string]interface{}`, `[]interface{}`等），因此这些类型的完整往返测试已被移除
-- cache_value 包主要用于简单类型或在 Memory 缓存中使用（不需要序列化）
+- cache_value 包使用可插拔的序列化系统，默认使用 Gob 序列化器
+- Gob 序列化器完整支持所有 Go 类型（包括复杂结构体、切片、map 等）
+- Redis 缓存也支持 JSON 序列化器，可通过 `WithRedisSerializer` 选项配置
 
 ### memory_test.go
 
@@ -141,8 +142,8 @@ go test ./test/ -run '^TestMemorySetAndGet$' -v
 
 **已知限制**：
 - Redis的过期时间最小单位是1秒，小于1秒的值会被截断为1秒
-- 由于msgpack的限制，复杂结构体无法直接反序列化，会被转换为`map[string]interface{}`
-- 如需使用复杂结构体，建议使用Memory缓存
+- Gob 序列化器（默认）只能在 Go 应用之间使用，如需跨语言支持请使用 JSON 序列化器
+- JSON 序列化器不支持某些复杂类型（如 channel、func 等）
 
 ### nil_value_test.go
 

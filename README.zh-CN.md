@@ -14,7 +14,7 @@ go-cache 是一个统一接口的 Go 缓存库，提供了多种缓存实现方�
 - **TTL 支持**: 支持设置键的生存时间
 - **缓存穿透保护**: 提供 `GetSet` 方法防止缓存穿透
 - **可插拔序列化**: 支持 Gob（默认）和 JSON 序列化器，可自定义扩展
-- **nil 值支持**: 完整支持 nil 指针、nil 切片和 nil map
+- **完整的 nil 值支持**: 完整支持 nil 指针、nil 切片和 nil map
 - **过期管理**: 支持设置具体的过期时间或相对的 TTL
 - **上下文支持**: 所有操作都支持 context.Context
 
@@ -35,7 +35,7 @@ go-cache/
 ├── none.go            # 空缓存实现
 ├── serializer/        # 序列化器包
 │   ├── serializer.go  # 序列化器接口
-│   ├── gob.go         # Gob 序列化器
+│   ├── gob.go         # Gob 序列化器（默认）
 │   └── json.go        # JSON 序列化器
 └── cache_value/       # 缓存值处理
     └── cache_value.go # 序列化/反序列化逻辑
@@ -114,7 +114,7 @@ func main() {
 		DB:       0,  // 默认 DB
 	})
 	
-	// 创建 Redis 缓存
+	// 创建 Redis 缓存，使用默认的 Gob 序列化器
 	cache := go_cache.NewRedis(rdb)
 	ctx := context.Background()
 	
@@ -297,7 +297,55 @@ func main() {
 - **跨语言用 JSON** - 适合微服务架构
 - **调试时用 JSON** - 方便查看 Redis 中的数据
 
-详细使用指南请参阅 [SERIALIZER_GUIDE.md](SERIALIZER_GUIDE.md)
+详细使用指南请参阅 [SERIALIZER_GUIDE.md](docs/SERIALIZER_GUIDE.md)
+
+### Nil 值支持
+
+go-cache 提供完整的 nil 值支持，允许您区分"键不存在"和"键存在但值为 nil"：
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+	
+	"github.com/muleiwu/go-cache"
+)
+
+func main() {
+	cache := go_cache.NewMemory(5*time.Minute, 10*time.Minute)
+	ctx := context.Background()
+	
+	// 存储 nil 指针
+	var user *User = nil
+	err := cache.Set(ctx, "user:123", user, 10*time.Minute)
+	if err != nil {
+		panic(err)
+	}
+	
+	// 获取 nil 指针
+	var result *User
+	err = cache.Get(ctx, "user:123", &result)
+	if err != nil {
+		panic(err)
+	}
+	
+	fmt.Printf("用户为 nil: %v\n", result == nil) // 输出: 用户为 nil: true
+	
+	// 检查键是否存在
+	exists := cache.Exists(ctx, "user:123")
+	fmt.Printf("键存在: %v\n", exists) // 输出: 键存在: true
+}
+
+type User struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+```
+
+详细的 nil 值使用方法请参阅 [NIL_VALUES.md](docs/NIL_VALUES.md)
 
 ## 📚 API 文档
 
@@ -379,10 +427,18 @@ err = cache.ExpiresAt(ctx, "key", time.Now().Add(5*time.Minute))
 #### 构造函数
 
 ```go
-func NewRedis(conn *redis.Client) *Redis
+func NewRedis(conn *redis.Client, opts ...RedisOption) *Redis
 ```
 
 - `conn`: Redis 客户端连接
+- `opts`: 可选配置（例如 WithRedisSerializer）
+
+#### 选项
+
+```go
+// 使用自定义序列化器
+cache := go_cache.NewRedis(rdb, go_cache.WithRedisSerializer(serializer.NewJson()))
+```
 
 #### 特性
 
@@ -403,8 +459,11 @@ rdb := redis.NewClient(&redis.Options{
     DB:       0,
 })
 
-// 创建 Redis 缓存
+// 创建使用默认 Gob 序列化器的 Redis 缓存
 cache := go_cache.NewRedis(rdb)
+
+// 或创建使用 JSON 序列化器的 Redis 缓存
+cache := go_cache.NewRedis(rdb, go_cache.WithRedisSerializer(serializer.NewJson()))
 
 // 使用方式与内存缓存相同
 err := cache.Set(ctx, "key", "value", 10*time.Minute)
@@ -556,75 +615,6 @@ func GetProduct(id int) (*Product, error) {
 }
 ```
 
-### 4. 缓存雪崩预防
-
-```go
-// 为不同的键设置不同的过期时间
-func SetUserWithRandomTTL(user *User) error {
-    // 基础 TTL 为 10 分钟
-    baseTTL := 10 * time.Minute
-    
-    // 添加随机偏移量，防止同时过期
-    randomOffset := time.Duration(rand.Intn(300)) * time.Second // 0-5 分钟随机偏移
-    
-    ttl := baseTTL + randomOffset
-    
-    return cache.Set(ctx, fmt.Sprintf("user:%d", user.ID), user, ttl)
-}
-```
-
-### 5. 缓存预热
-
-```go
-func WarmupCache() error {
-    // 预加载热点数据
-    hotUsers := []int{1, 2, 3, 4, 5}
-    
-    for _, id := range hotUsers {
-        var user User
-        err := db.GetUser(id, &user)
-        if err != nil {
-            continue
-        }
-        
-        cache.Set(ctx, fmt.Sprintf("user:%d", id), user, 30*time.Minute)
-    }
-    
-    return nil
-}
-```
-
-## 🔧 高级配置
-
-### 内存缓存调优
-
-```go
-// 高频访问场景：短过期时间，频繁清理
-cache := go_cache.NewMemory(1*time.Minute, 2*time.Minute)
-
-// 低频访问场景：长过期时间，低频清理
-cache := go_cache.NewMemory(30*time.Minute, 1*time.Hour)
-
-// 大数据量场景：增加清理频率
-cache := go_cache.NewMemory(10*time.Minute, 5*time.Minute)
-```
-
-### Redis 配置优化
-
-```go
-// 使用连接池
-rdb := redis.NewClient(&redis.Options{
-    Addr:         "localhost:6379",
-    Password:     "",
-    DB:           0,
-    PoolSize:     10,  // 连接池大小
-    MinIdleConns: 5,   // 最小空闲连接
-    MaxRetries:   3,   // 最大重试次数
-})
-
-cache := go_cache.NewRedis(rdb)
-```
-
 ## 🧪 测试
 
 ### 单元测试示例
@@ -662,36 +652,6 @@ func TestMemoryCache(t *testing.T) {
     assert.NoError(t, err)
     assert.False(t, cache.Exists(ctx, "test_key"))
 }
-
-func TestCacheGetSet(t *testing.T) {
-    cache := go_cache.NewMemory(5*time.Minute, 10*time.Minute)
-    ctx := context.Background()
-    
-    var result string
-    callCount := 0
-    
-    // 第一次调用，缓存未命中
-    err := cache.GetSet(ctx, "test_key", 10*time.Minute, &result, func(key string, obj any) error {
-        callCount++
-        str := obj.(*string)
-        *str = "callback_value"
-        return nil
-    })
-    
-    assert.NoError(t, err)
-    assert.Equal(t, "callback_value", result)
-    assert.Equal(t, 1, callCount)
-    
-    // 第二次调用，缓存命中
-    err = cache.GetSet(ctx, "test_key", 10*time.Minute, &result, func(key string, obj any) error {
-        callCount++
-        return nil
-    })
-    
-    assert.NoError(t, err)
-    assert.Equal(t, "callback_value", result)
-    assert.Equal(t, 1, callCount) // 回调函数未被调用
-}
 ```
 
 ### 基准测试
@@ -706,22 +666,30 @@ func BenchmarkMemoryCacheSet(b *testing.B) {
         cache.Set(ctx, fmt.Sprintf("key_%d", i), fmt.Sprintf("value_%d", i), 10*time.Minute)
     }
 }
+```
 
-func BenchmarkMemoryCacheGet(b *testing.B) {
-    cache := go_cache.NewMemory(5*time.Minute, 10*time.Minute)
-    ctx := context.Background()
-    
-    // 预设数据
-    for i := 0; i < 1000; i++ {
-        cache.Set(ctx, fmt.Sprintf("key_%d", i), fmt.Sprintf("value_%d", i), 10*time.Minute)
-    }
-    
-    b.ResetTimer()
-    for i := 0; i < b.N; i++ {
-        var result string
-        cache.Get(ctx, fmt.Sprintf("key_%d", i%1000), &result)
-    }
-}
+## 📊 性能基准
+
+基于在 Apple M4 Pro 上执行的测试：
+
+### 内存缓存性能
+
+```
+BenchmarkMemorySet-14       26337690        45.49 ns/op       0 B/op    0 allocs/op
+BenchmarkMemoryGet-14       22087718        54.17 ns/op      16 B/op    1 allocs/op
+BenchmarkMemoryExists-14    34378371        35.17 ns/op       0 B/op    0 allocs/op
+```
+
+### 序列化器性能
+
+```
+Gob 序列化器:
+- 编码: ~1052 ns/op
+- 解码: ~6199 ns/op
+
+JSON 序列化器:
+- 编码: ~161 ns/op
+- 解码: ~1436 ns/op
 ```
 
 ## 🚨 注意事项
@@ -733,8 +701,15 @@ func BenchmarkMemoryCacheGet(b *testing.B) {
 
 ### 2. 序列化限制
 
-- Redis 缓存使用 msgpack 序列化，不支持函数、通道等不可序列化的类型
-- 复杂结构体需要确保所有字段都是可序列化的
+- **Gob 序列化**（Redis 缓存默认使用）：
+  - 不支持函数、通道等不可序列化的类型
+  - 无法序列化未导出的字段（小写字段名）
+  - 只能在 Go 应用之间使用
+- **JSON 序列化**：
+  - 不支持函数、通道和某些复杂类型
+  - 某些数值类型可能会丢失精度
+  - 可以跨不同语言使用
+- 复杂结构体需要确保所有字段都可以被所选序列化器序列化
 
 ### 3. 内存管理
 
@@ -750,6 +725,18 @@ func BenchmarkMemoryCacheGet(b *testing.B) {
 
 - Redis 缓存可能会因为网络问题返回错误
 - 建议实现重试机制或降级策略
+
+## 🔗 相关链接
+
+- [gsr 接口库](https://github.com/muleiwu/gsr)
+- [patrickmn/go-cache](https://github.com/patrickmn/go-cache)
+- [redis/go-redis](https://github.com/redis/go-redis)
+- [Go encoding/gob](https://pkg.go.dev/encoding/gob)
+- [Go encoding/json](https://pkg.go.dev/encoding/json)
+
+## 📝 许可证
+
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 🤝 贡献
 
@@ -778,26 +765,13 @@ go test ./...
 go test -bench=. ./...
 ```
 
-## 📄 许可证
+## 📄 附加文档
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
-## 🔗 相关链接
-
-- [gsr 接口库](https://github.com/muleiwu/gsr)
-- [patrickmn/go-cache](https://github.com/patrickmn/go-cache)
-- [redis/go-redis](https://github.com/redis/go-redis)
-- [vmihailenco/msgpack](https://github.com/vmihailenco/msgpack)
-
-## 📊 性能对比
-
-| 操作 | 内存缓存 | Redis 缓存 | 空缓存 |
-|------|----------|------------|--------|
-| Set  | ~100ns   | ~1ms       | ~10ns  |
-| Get  | ~100ns   | ~1ms       | ~10ns  |
-| Del  | ~100ns   | ~1ms       | ~10ns  |
-
-*注：以上数据为参考值，实际性能取决于硬件配置和网络环境*
+- [SERIALIZER_GUIDE.md](docs/SERIALIZER_GUIDE.md) - 详细的序列化器使用指南
+- [NIL_VALUES.md](docs/NIL_VALUES.md) - Nil 值支持文档
+- [GOB_MIGRATION.md](docs/GOB_MIGRATION.md) - 从 msgpack 迁移到 gob 的说明
+- [IMPROVEMENTS.md](docs/IMPROVEMENTS.md) - 项目改进记录
+- [test/README.md](test/README.md) - 测试文档
 
 ## 🆘 常见问题
 
@@ -817,15 +791,22 @@ cache := go_cache.NewRedis(redisClient)
 
 ### Q: 如何处理缓存中的 nil 值？
 
-A: go-cache 不支持直接存储 nil 值，建议使用指针类型或特殊标记：
+A: go-cache 完全支持 nil 值。您可以区分"键不存在"和"键存在但值为 nil"：
 
 ```go
-// 使用指针类型
-var user *User
-cache.Set(ctx, "user:123", user, 10*time.Minute)
-
-// 或使用特殊标记
-cache.Set(ctx, "user:123", nil, 10*time.Minute) // 不推荐
+// 检查键是否存在
+if !cache.Exists(ctx, "key") {
+    // 键不存在
+} else {
+    var value *SomeType
+    if err := cache.Get(ctx, "key", &value); err == nil {
+        if value == nil {
+            // 键存在但值为 nil
+        } else {
+            // 键存在且有值
+        }
+    }
+}
 ```
 
 ### Q: 如何监控缓存性能？
@@ -853,6 +834,19 @@ func (c *CacheWithMetrics) Get(ctx context.Context, key string, obj any) error {
     return err
 }
 ```
+
+### Q: 如何选择 Gob 和 JSON 序列化器？
+
+A: 
+- **使用 Gob**（默认）适用于需要类型安全的纯 Go 应用
+  - 完整的类型安全保证
+  - 支持复杂的 Go 类型（接口、指针等）
+  - 性能稍慢，但类型匹配更可靠
+- **使用 JSON** 适用于跨语言场景或需要调试的情况
+  - 编码和解码性能都更快（约 4-6 倍）
+  - 人类可读，便于调试
+  - 跨语言支持
+  - 类型安全性较弱
 
 ---
 
