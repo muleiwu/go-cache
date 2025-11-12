@@ -6,16 +6,40 @@ import (
 	"time"
 
 	"github.com/muleiwu/go-cache/cache_value"
+	"github.com/muleiwu/go-cache/serializer"
 	"github.com/muleiwu/gsr"
 	"github.com/redis/go-redis/v9"
 )
 
 type Redis struct {
-	conn *redis.Client
+	conn       *redis.Client
+	serializer serializer.Serializer
 }
 
-func NewRedis(conn *redis.Client) *Redis {
-	return &Redis{conn: conn}
+// RedisOption Redis缓存选项
+type RedisOption func(*Redis)
+
+// WithRedisSerializer 设置Redis缓存的序列化器
+func WithRedisSerializer(s serializer.Serializer) RedisOption {
+	return func(r *Redis) {
+		r.serializer = s
+	}
+}
+
+// NewRedis 创建Redis缓存实例
+// 默认使用gob序列化器
+func NewRedis(conn *redis.Client, opts ...RedisOption) *Redis {
+	r := &Redis{
+		conn:       conn,
+		serializer: cache_value.GetDefaultSerializer(), // 默认使用gob
+	}
+
+	// 应用选项
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 func (c *Redis) Exists(ctx context.Context, key string) bool {
@@ -33,7 +57,7 @@ func (c *Redis) Get(ctx context.Context, key string, obj any) error {
 		return err
 	}
 
-	err = cache_value.Decode([]byte(result), obj)
+	err = c.serializer.Decode([]byte(result), obj)
 	if err != nil {
 		return err
 	}
@@ -42,7 +66,7 @@ func (c *Redis) Get(ctx context.Context, key string, obj any) error {
 }
 
 func (c *Redis) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
-	encode, err := cache_value.Encode(value)
+	encode, err := c.serializer.Encode(value)
 	if err != nil {
 		return err
 	}
