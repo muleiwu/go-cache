@@ -13,7 +13,8 @@ go-cache 是一个统一接口的 Go 缓存库，提供了多种缓存实现方�
 - **类型安全**: 使用反射确保类型安全的值赋值
 - **TTL 支持**: 支持设置键的生存时间
 - **缓存穿透保护**: 提供 `GetSet` 方法防止缓存穿透
-- **序列化支持**: 使用 msgpack 进行高效的序列化和反序列化
+- **可插拔序列化**: 支持 Gob（默认）和 JSON 序列化器，可自定义扩展
+- **nil 值支持**: 完整支持 nil 指针、nil 切片和 nil map
 - **过期管理**: 支持设置具体的过期时间或相对的 TTL
 - **上下文支持**: 所有操作都支持 context.Context
 
@@ -32,6 +33,10 @@ go-cache/
 ├── memory.go          # 内存缓存实现
 ├── redis.go           # Redis 缓存实现
 ├── none.go            # 空缓存实现
+├── serializer/        # 序列化器包
+│   ├── serializer.go  # 序列化器接口
+│   ├── gob.go         # Gob 序列化器
+│   └── json.go        # JSON 序列化器
 └── cache_value/       # 缓存值处理
     └── cache_value.go # 序列化/反序列化逻辑
 ```
@@ -42,7 +47,8 @@ go-cache/
 2. **内存缓存** (`Memory`): 基于内存的缓存实现，适用于单机应用
 3. **Redis缓存** (`Redis`): 基于 Redis 的分布式缓存实现
 4. **空缓存** (`None`): 空操作实现，用于测试或禁用缓存场景
-5. **值处理** (`cache_value`): 处理缓存值的序列化和反序列化
+5. **序列化系统** (`serializer`): 可插拔的序列化器，支持 Gob 和 JSON
+6. **值处理** (`cache_value`): 处理缓存值的序列化和反序列化
 
 ## 🚀 快速开始
 
@@ -189,6 +195,110 @@ type User struct {
 }
 ```
 
+### 可插拔序列化器示例
+
+#### 使用 JSON 序列化器（跨语言、人类可读）
+
+```go
+package main
+
+import (
+	"context"
+	"time"
+	
+	"github.com/muleiwu/go-cache"
+	"github.com/muleiwu/go-cache/serializer"
+	"github.com/redis/go-redis/v9"
+)
+
+func main() {
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	
+	// 使用 JSON 序列化器
+	cache := go_cache.NewRedis(rdb, go_cache.WithRedisSerializer(serializer.NewJson()))
+	ctx := context.Background()
+	
+	// JSON 序列化的数据在 Redis 中是人类可读的
+	type User struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+	
+	user := User{ID: 1, Name: "张三"}
+	cache.Set(ctx, "user:1", user, 10*time.Minute)
+	
+	// 在 Redis CLI 中可以直接查看：
+	// redis-cli GET user:1
+	// {"is_nil":false,"value":{"id":1,"name":"张三"}}
+}
+```
+
+#### 使用 Gob 序列化器（默认，类型安全）
+
+```go
+package main
+
+import (
+	"context"
+	"time"
+	
+	"github.com/muleiwu/go-cache"
+	"github.com/muleiwu/go-cache/serializer"
+	"github.com/redis/go-redis/v9"
+)
+
+func main() {
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	
+	// 显式指定 Gob 序列化器（默认已是 Gob）
+	cache := go_cache.NewRedis(rdb, go_cache.WithRedisSerializer(serializer.NewGob()))
+	ctx := context.Background()
+	
+	// Gob 完美处理复杂结构体和 nil 值
+	type Config struct {
+		Settings map[string]interface{}
+		Version  *string
+	}
+	
+	version := "v1.0.0"
+	config := Config{
+		Settings: map[string]interface{}{"timeout": 30},
+		Version:  &version,
+	}
+	
+	cache.Set(ctx, "config", config, 1*time.Hour)
+	
+	// 获取时完全还原类型，包括指针
+	var cached Config
+	cache.Get(ctx, "config", &cached)
+	// cached.Version 指向正确的字符串
+}
+```
+
+#### 序列化器对比
+
+| 特性 | Gob | JSON |
+|------|-----|------|
+| **类型安全** | ✅ 完整 | ⚠️ 部分 |
+| **性能（编码）** | 中等 (~1052 ns/op) | 快 (~161 ns/op) |
+| **性能（解码）** | 慢 (~6199 ns/op) | 中等 (~1436 ns/op) |
+| **跨语言支持** | ❌ 仅 Go | ✅ 全语言 |
+| **人类可读** | ❌ 二进制 | ✅ 文本 |
+| **复杂结构体** | ✅ 完美支持 | ✅ 良好支持 |
+| **nil 值支持** | ✅ 完整 | ✅ 完整 |
+| **调试友好** | ⚠️ 困难 | ✅ 容易 |
+
+**使用建议**：
+- **默认使用 Gob** - 适合纯 Go 应用，类型安全
+- **跨语言用 JSON** - 适合微服务架构
+- **调试时用 JSON** - 方便查看 Redis 中的数据
+
+详细使用指南请参阅 [SERIALIZER_GUIDE.md](SERIALIZER_GUIDE.md)
+
 ## 📚 API 文档
 
 ### 接口定义
@@ -277,7 +387,9 @@ func NewRedis(conn *redis.Client) *Redis
 #### 特性
 
 - 基于 Redis 的分布式缓存
-- 使用 msgpack 进行序列化
+- **可插拔序列化**: 默认使用 Gob，可切换为 JSON 或自定义序列化器
+- **完整类型安全**: Gob 序列化器保证类型安全
+- **nil 值支持**: 完整支持 nil 指针、nil 切片和 nil map
 - 支持所有 Redis 数据类型
 - 适用于分布式系统
 
