@@ -2,6 +2,7 @@ package go_cache
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/muleiwu/go-cache/cache_value"
@@ -53,13 +54,26 @@ func (c *Redis) Set(ctx context.Context, key string, value any, ttl time.Duratio
 }
 
 func (c *Redis) GetSet(ctx context.Context, key string, ttl time.Duration, obj any, fun gsr.CacheCallback) error {
+	// 先尝试从缓存获取
+	err := c.Get(ctx, key, obj)
+	if err == nil {
+		// 缓存命中，直接返回
+		return nil
+	}
 
-	err := fun(key, obj)
+	// 缓存未命中，调用回调函数
+	err = fun(key, obj)
 	if err != nil {
 		return err
 	}
 
-	return c.Set(ctx, key, obj, ttl)
+	// 获取obj指向的实际值并存入缓存
+	// obj是一个指针，我们需要存储它指向的值
+	objValue := reflect.ValueOf(obj)
+	if objValue.Kind() == reflect.Ptr {
+		objValue = objValue.Elem()
+	}
+	return c.Set(ctx, key, objValue.Interface(), ttl)
 }
 
 func (c *Redis) Del(ctx context.Context, key string) error {

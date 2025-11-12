@@ -41,13 +41,26 @@ func (c *Memory) Set(ctx context.Context, key string, value any, ttl time.Durati
 }
 
 func (c *Memory) GetSet(ctx context.Context, key string, ttl time.Duration, obj any, fun gsr.CacheCallback) error {
+	// 先尝试从缓存获取
+	err := c.Get(ctx, key, obj)
+	if err == nil {
+		// 缓存命中，直接返回
+		return nil
+	}
 
-	err := fun(key, obj)
+	// 缓存未命中，调用回调函数
+	err = fun(key, obj)
 	if err != nil {
 		return err
 	}
 
-	return c.Set(ctx, key, obj, ttl)
+	// 获取obj指向的实际值并存入缓存
+	// obj是一个指针，我们需要存储它指向的值
+	objValue := reflect.ValueOf(obj)
+	if objValue.Kind() == reflect.Ptr {
+		objValue = objValue.Elem()
+	}
+	return c.Set(ctx, key, objValue.Interface(), ttl)
 }
 
 func (c *Memory) Del(ctx context.Context, key string) error {
@@ -56,27 +69,35 @@ func (c *Memory) Del(ctx context.Context, key string) error {
 }
 
 func (c *Memory) ExpiresAt(ctx context.Context, key string, expiresAt time.Time) error {
-	var obj any
-	err := c.Get(ctx, key, &obj)
-	if err != nil {
-		return err
+	// 检查键是否存在
+	val, found := c.cache.Get(key)
+	if !found {
+		return errors.New("key not exists")
 	}
 
-	now := time.Now()
+	// 计算正确的TTL（过期时间 - 当前时间）
+	ttl := time.Until(expiresAt)
+	if ttl < 0 {
+		// 如果已经过期，删除键
+		c.cache.Delete(key)
+		return nil
+	}
 
-	c.cache.Set(key, obj, now.Sub(expiresAt))
+	// 重新设置带新TTL的值
+	c.cache.Set(key, val, ttl)
 
 	return nil
 }
 
 func (c *Memory) ExpiresIn(ctx context.Context, key string, ttl time.Duration) error {
-	var obj any
-	err := c.Get(ctx, key, &obj)
-	if err != nil {
-		return err
+	// 检查键是否存在
+	val, found := c.cache.Get(key)
+	if !found {
+		return errors.New("key not exists")
 	}
 
-	c.cache.Set(key, obj, ttl)
+	// 重新设置带新TTL的值
+	c.cache.Set(key, val, ttl)
 
 	return nil
 }
